@@ -1,3 +1,0 @@
-[2026-01-19 13:47:02] PHPMailer error: SMTP configuration missing. Use Mailtrap SMTP username/password (not API token).
-[2026-01-19 13:49:49] PHPMailer error: SMTP Error: Could not authenticate.
-[2026-01-19 13:53:08] PHPMailer error: SMTP Error: data not accepted.
