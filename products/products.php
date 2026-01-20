@@ -2,8 +2,6 @@
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
-
-// Fetch products from Fake Store API
 $api_url = 'https://fakestoreapi.com/products';
 $products = [];
 
@@ -11,7 +9,6 @@ $response = @file_get_contents($api_url);
 if ($response !== false) {
     $products = json_decode($response, true);
 } else {
-    // Fallback: try using cURL if file_get_contents fails
     if (function_exists('curl_init')) {
         $ch = curl_init($api_url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -25,7 +22,6 @@ if ($response !== false) {
     
 }
 
-// Handle search/filter inputs (GET)
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $categoryFilter = isset($_GET['category']) ? trim($_GET['category']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : '';
@@ -37,7 +33,6 @@ foreach ($products as $p) {
 $categories = array_unique($categories);
 sort($categories);
 
-// Apply filters to products array
 if ($q !== '' || ($categoryFilter !== '' && $categoryFilter !== 'all')) {
   $products = array_filter($products, function($p) use ($q, $categoryFilter) {
     $ok = true;
@@ -52,14 +47,12 @@ if ($q !== '' || ($categoryFilter !== '' && $categoryFilter !== 'all')) {
   $products = array_values($products);
 }
 
-// Apply sorting (independent of filters)
 if ($sort === 'price_asc') {
   usort($products, function($a, $b){ return ($a['price'] ?? 0) <=> ($b['price'] ?? 0); });
 } elseif ($sort === 'price_desc') {
   usort($products, function($a, $b){ return ($b['price'] ?? 0) <=> ($a['price'] ?? 0); });
 }
 
-// If requested by AJAX, return JSON of products
 if (isset($_GET['ajax'])) {
   header('Content-Type: application/json');
   echo json_encode(array_values($products));
@@ -228,7 +221,6 @@ document.addEventListener('DOMContentLoaded', function(){
 <?php endif; ?>
 </div>
 
-<!-- Product Details Modal -->
 <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
@@ -349,7 +341,6 @@ function openProductModal(product) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Quantity controls
   const decBtn = document.getElementById('decreaseQty');
   const incBtn = document.getElementById('increaseQty');
   const qtyInputEl = document.getElementById('modalQuantity');
@@ -373,14 +364,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Add to cart functionality
   const addBtn = document.getElementById('addToCartBtn');
   if (addBtn) addBtn.addEventListener('click', function() {
     <?php if (isset($_SESSION['user_id'])): ?>
     const productId = this.getAttribute('data-product-id');
     const quantity = parseInt((document.getElementById('modalQuantity')||{value:1}).value) || 1;
     
-    // Create FormData for AJAX submission
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('quantity', quantity);
@@ -389,15 +378,12 @@ document.addEventListener('DOMContentLoaded', function() {
     formData.append('product_image', currentProduct.image || '');
     formData.append('add_to_cart', '1');
     
-    // Send AJAX request
     fetch('/SCP/products/cart.php', {
       method: 'POST',
       body: formData
     })
     .then(response => {
-      // Close the modal
       bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-      // Show success message
       showToast('Item added to cart!', 'success');
     })
     .catch(error => {

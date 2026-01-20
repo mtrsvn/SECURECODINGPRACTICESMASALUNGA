@@ -3,15 +3,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if (ob_get_level() === 0) {
-    ob_start();
+  ob_start();
 }
+$__role = isset($_SESSION['role']) ? $_SESSION['role'] : null;
+$__isAdminArea = in_array($__role, ['staff_user', 'administrator', 'admin_sec'], true);
+$__pageTitle = $__isAdminArea ? 'Cartify - Staff' : 'Cartify';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cartify</title>
+    <title><?= htmlspecialchars($__pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <link rel="icon" href="/SCP/assets/store-solid-full.svg" type="image/svg+xml">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -28,7 +31,6 @@ if (ob_get_level() === 0) {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--light);
       color: var(--dark);
-      min-height: 100vh;
     }
     .navbar {
       background: #fff !important;
@@ -74,7 +76,6 @@ if (ob_get_level() === 0) {
       border-radius: 8px;
     }
     .btn-primary:hover { background: var(--primary-hover); }
-    /* Align danger button sizing with primary for consistent look */
     .btn-danger {
       border: none;
       padding: 0.6rem 1.5rem;
@@ -218,11 +219,18 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
       <ul class="navbar-nav align-items-center gap-1">
         <?php if(isset($_SESSION['username'])): ?>
-          <?php $isAdminUser = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator','admin_sec']); ?>
+          <?php 
+            $isAdminUser = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator','admin_sec']);
+            $canSeeAudit = isset($_SESSION['role']) && in_array($_SESSION['role'], ['administrator','admin_sec']);
+            $canManageProducts = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator']);
+          ?>
+          <?php if ($canManageProducts): ?>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'products_manage.php' ? 'active' : '' ?>" href="/SCP/staff/products_manage.php">Manage Products</a></li>
+          <?php endif; ?>
           <li class="nav-item"><a class="nav-link <?= ($current_page == 'products.php' || $current_page == 'index.php') ? 'active' : '' ?>" href="/SCP/products/products.php">Products</a></li>
-          <?php if ($isAdminUser): ?>
+          <?php if ($canSeeAudit): ?>
             <li class="nav-item"><a class="nav-link <?= $current_page == 'audit_log.php' ? 'active' : '' ?>" href="/SCP/admin/audit_log.php">Audit</a></li>
-          <?php else: ?>
+          <?php elseif (!$isAdminUser): ?>
             <li class="nav-item"><a class="nav-link <?= $current_page == 'cart.php' ? 'active' : '' ?>" href="/SCP/products/cart.php">Cart</a></li>
           <?php endif; ?>
           <?php if(isset($_SESSION['role']) && $_SESSION['role']=='admin_sec'): ?>

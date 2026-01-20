@@ -35,6 +35,8 @@ function send_otp_email(string $toEmail, string $toName, string $otp): array {
     if ($usePHPMailer) {
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->CharSet = 'UTF-8';
 
             $host   = getenv('SMTP_HOST') ?: 'sandbox.smtp.mailtrap.io';
             $user   = getenv('SMTP_USER') ?: (getenv('MAILTRAP_USER') ?: '');
@@ -269,5 +271,131 @@ function send_purchase_confirmation_email(string $toEmail, string $toName, array
     }
     $errorMsg .= 'PHP mail() also failed.';
     
+    return ['success' => false, 'error' => $errorMsg];
+}
+
+function send_purchase_rejection_email(string $toEmail, string $toName, array $items, float $total = 0.0, string $reason = ''): array {
+    $devMode = getenv('MAIL_DEV_MODE') ?: false;
+
+    if ($devMode) {
+        $logFile = __DIR__ . '/../mail_dev.log';
+        $logEntry = sprintf("[%s] REJECT to %s <%s> | Items: %d | Total: $%0.2f | Reason: %s\n",
+            date('Y-m-d H:i:s'), $toName, $toEmail, count($items), (float)$total, $reason ?: 'n/a');
+        @file_put_contents($logFile, $logEntry, FILE_APPEND);
+        return ['success' => true, 'error' => null, 'dev_mode' => true];
+    }
+
+    $autoload = __DIR__ . '/../vendor/autoload.php';
+    $usePHPMailer = false;
+    $phpmailerError = null;
+
+    if (file_exists($autoload)) {
+        require_once $autoload;
+        $usePHPMailer = true;
+    } else {
+        $base = __DIR__ . '/PHPMailer/src';
+        if (file_exists($base.'/PHPMailer.php') && file_exists($base.'/SMTP.php') && file_exists($base.'/Exception.php')) {
+            require_once $base.'/PHPMailer.php';
+            require_once $base.'/SMTP.php';
+            require_once $base.'/Exception.php';
+            $usePHPMailer = true;
+        }
+    }
+
+    if ($usePHPMailer) {
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+
+            $host   = getenv('SMTP_HOST') ?: 'sandbox.smtp.mailtrap.io';
+            $user   = getenv('SMTP_USER') ?: (getenv('MAILTRAP_USER') ?: '');
+            $pass   = getenv('SMTP_PASS') ?: (getenv('MAILTRAP_PASS') ?: '');
+            $port   = (int)(getenv('SMTP_PORT') ?: 2525);
+            $secure = getenv('SMTP_SECURE') ?: '';
+            $from   = getenv('SMTP_FROM') ?: 'no-reply@cartify.local';
+            $fromName = getenv('SMTP_FROM_NAME') ?: 'Cartify';
+
+            $fileCfgPath = __DIR__ . '/smtp_creds.php';
+            if (file_exists($fileCfgPath)) {
+                $cfg = include $fileCfgPath;
+                if (is_array($cfg)) {
+                    $host = $cfg['host'] ?? $host;
+                    $port = isset($cfg['port']) ? (int)$cfg['port'] : $port;
+                    $user = $cfg['username'] ?? $user;
+                    $pass = $cfg['password'] ?? $pass;
+                    $secure = $cfg['secure'] ?? $secure;
+                    $from = $cfg['from'] ?? $from;
+                    $fromName = $cfg['from_name'] ?? $fromName;
+                }
+            }
+
+            $mail->isSMTP();
+            $mail->Host = $host;
+            $mail->Port = $port;
+            $mail->SMTPAuth = true;
+            $mail->SMTPAutoTLS = false;
+            $mail->AuthType = 'LOGIN';
+            $mail->Username = $user;
+            $mail->Password = $pass;
+            $mail->SMTPSecure = $secure;
+
+            $mail->setFrom($from, $fromName);
+            $mail->addAddress($toEmail, $toName ?: $toEmail);
+
+            $mail->isHTML(true);
+            $mail->Subject = 'Order Update - Cartify';
+
+            $itemsList = '';
+            foreach ($items as $item) {
+                $name = htmlspecialchars($item['name'] ?? 'Item', ENT_QUOTES, 'UTF-8');
+                $qty = (int)($item['quantity'] ?? 1);
+                $price = number_format((float)($item['price'] ?? 0), 2);
+                $subtotal = number_format(((float)($item['price'] ?? 0)) * $qty, 2);
+                $itemsList .= "<tr><td>{$name}</td><td>{$qty}</td><td>$$price</td><td>$$subtotal</td></tr>";
+            }
+            $totalHtml = $total > 0 ? '<tfoot><tr><td colspan="3" style="text-align:right; padding:8px; border-top:2px solid #ddd;"><strong>Requested Total:</strong></td><td style="padding:8px; border-top:2px solid #ddd;"><strong>$'.number_format($total,2).'</strong></td></tr></tfoot>' : '';
+            $reasonHtml = $reason !== '' ? '<p><strong>Reason:</strong> '.htmlspecialchars($reason, ENT_QUOTES, 'UTF-8').'</p>' : '';
+
+            $mail->Body = "<p>Hello <strong>{$toName}</strong>,</p><p>We are sorry to inform you that your order could not be processed.</p>{$reasonHtml}<table style='width:100%; border-collapse: collapse;'><thead><tr><th style='text-align:left; padding:8px; border-bottom:1px solid #ddd;'>Product</th><th style='text-align:left; padding:8px; border-bottom:1px solid #ddd;'>Qty</th><th style='text-align:left; padding:8px; border-bottom:1px solid #ddd;'>Price</th><th style='text-align:left; padding:8px; border-bottom:1px solid #ddd;'>Subtotal</th></tr></thead><tbody>{$itemsList}</tbody>{$totalHtml}</table><p>If you have any questions, just reply to this email.</p><p>Best regards,<br>Cartify Team</p>";
+
+            $itemsListText = '';
+            foreach ($items as $item) {
+                $itemsListText .= ($item['name'] ?? 'Item')." (x".(int)($item['quantity'] ?? 1).") - $".number_format((float)($item['price'] ?? 0),2)."\n";
+            }
+            $alt = "Hello {$toName},\n\nWe are sorry to inform you that your order could not be processed.";
+            if ($reason !== '') { $alt .= "\nReason: {$reason}"; }
+            $alt .= "\n\nOrder Details:\n{$itemsListText}";
+            if ($total > 0) { $alt .= "\nRequested Total: $".number_format($total,2); }
+            $alt .= "\n\nIf you have any questions, please reply to this email.\n\nBest regards,\nCartify Team";
+            $mail->AltBody = $alt;
+
+            $mail->send();
+            return ['success' => true, 'error' => null];
+        } catch (\Exception $e) {
+            $phpmailerError = $e->getMessage();
+        }
+    }
+
+    $subject = 'Order Update - Cartify';
+    $message  = "Hello {$toName},\n\nWe are sorry to inform you that your order could not be processed.";
+    if ($reason !== '') { $message .= "\nReason: {$reason}"; }
+    $message .= "\n\nOrder Details:\n";
+    foreach ($items as $item) {
+        $message .= ($item['name'] ?? 'Item')." (x".(int)($item['quantity'] ?? 1).") - $".number_format((float)($item['price'] ?? 0),2)."\n";
+    }
+    if ($total > 0) { $message .= "\nRequested Total: $".number_format($total,2); }
+    $message .= "\n\nIf you have any questions, please reply to this email.\n\nBest regards,\nCartify Team";
+
+    $headers = "From: Cartify <no-reply@cartify.local>\r\n";
+    $headers .= "Reply-To: no-reply@cartify.local\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= "X-Mailer: PHP/" . phpversion();
+
+    if (@mail($toEmail, $subject, $message, $headers)) {
+        return ['success' => true, 'error' => null];
+    }
+
+    $errorMsg = 'Rejection email could not be sent. ';
+    if ($phpmailerError) { $errorMsg .= 'PHPMailer error: ' . $phpmailerError . ' | '; }
+    $errorMsg .= 'PHP mail() also failed.';
     return ['success' => false, 'error' => $errorMsg];
 }

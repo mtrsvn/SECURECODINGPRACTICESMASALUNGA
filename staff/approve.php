@@ -40,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['purchase_id'])) {
     if (function_exists('log_action')) {
       log_action($conn, (int)$purchase['user_id'], 'Order item approved and email sent');
     }
+    $_SESSION['admin_toast'] = [
+      'message' => 'Order approved and customer notified.',
+      'type' => 'success'
+    ];
   }
 }
 
@@ -49,6 +53,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reject_id'])) {
   $stmt->bind_param("i", $rid);
   $stmt->execute();
   $stmt->close();
+
+  require_once '../includes/mailer.php';
+  $detailStmt = $conn->prepare(
+    "SELECT p.id, p.user_id, p.product_name, p.product_price, p.quantity, u.email, u.username
+     FROM purchases p
+     JOIN users u ON p.user_id = u.id
+     WHERE p.id = ?"
+  );
+  $detailStmt->bind_param('i', $rid);
+  $detailStmt->execute();
+  $detailRes = $detailStmt->get_result();
+  $purchase = $detailRes->fetch_assoc();
+  $detailStmt->close();
+
+  if ($purchase && !empty($purchase['email'])) {
+    $items = [[
+      'name' => $purchase['product_name'],
+      'quantity' => (int)$purchase['quantity'],
+      'price' => (float)$purchase['product_price']
+    ]];
+    $total = (float)$purchase['product_price'] * (int)$purchase['quantity'];
+    send_purchase_rejection_email($purchase['email'], $purchase['username'] ?? $purchase['email'], $items, $total);
+    if (function_exists('log_action')) {
+      log_action($conn, (int)$purchase['user_id'], 'Order item rejected and email sent');
+    }
+    $_SESSION['admin_toast'] = [
+      'message' => 'Order rejected and customer notified.',
+      'type' => 'warning'
+    ];
+  }
 }
 
 $res = $conn->query("SELECT purchases.*, users.username, products.name AS product_name FROM purchases 
@@ -79,7 +113,7 @@ WHERE purchases.approved=0");
           </form>
           <form method="post" style="margin:0;">
             <input type="hidden" name="reject_id" value="<?= $row['id'] ?>">
-            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Reject this order?')">Reject</button>
+            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
           </form>
         </div>
       </td>
@@ -87,5 +121,20 @@ WHERE purchases.approved=0");
     <?php endwhile; ?>
   </tbody>
 </table>
+
+<?php if (!empty($_SESSION['admin_toast'])): ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      try {
+        var msg = <?php echo json_encode($_SESSION['admin_toast']['message']); ?>;
+        var type = <?php echo json_encode($_SESSION['admin_toast']['type']); ?>;
+        if (typeof showToast === 'function') {
+          showToast(msg, type);
+        }
+      } catch(e) {}
+    });
+  </script>
+  <?php unset($_SESSION['admin_toast']); ?>
+<?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>

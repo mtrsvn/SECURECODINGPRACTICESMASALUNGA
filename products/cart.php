@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_to_cart'])) {
         $stmt->close();
     if (function_exists('log_action')) {
       $safeName = is_string($product_name) ? $product_name : 'Unknown Product';
-      $actionMsg = sprintf('Added to cart: %s x%d (product_id=%d)', $safeName, $quantity, $product_id);
+      $actionMsg = sprintf('Added to cart: %s x%d', $safeName, $quantity);
       log_action($conn, (int)$_SESSION['user_id'], $actionMsg);
     }
     }
@@ -34,10 +34,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_to_cart'])) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['remove_item'])) {
     $product_id = intval($_POST['product_id'] ?? 0);
     if (isset($_SESSION['user_id'])) {
-        $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ? AND product_id = ?");
-        $stmt->bind_param('ii', $_SESSION['user_id'], $product_id);
-        $stmt->execute();
-        $stmt->close();
+    $preStmt = $conn->prepare("SELECT product_name, quantity FROM cart WHERE user_id = ? AND product_id = ?");
+    $preStmt->bind_param('ii', $_SESSION['user_id'], $product_id);
+    $preStmt->execute();
+    $preRes = $preStmt->get_result();
+    $existing = $preRes ? $preRes->fetch_assoc() : null;
+    $preStmt->close();
+
+    $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ? AND product_id = ?");
+    $stmt->bind_param('ii', $_SESSION['user_id'], $product_id);
+    $stmt->execute();
+    $stmt->close();
+
+    if ($existing && function_exists('log_action')) {
+      $safeName = is_string($existing['product_name'] ?? null) ? $existing['product_name'] : 'Unknown Product';
+      $qty = (int)($existing['quantity'] ?? 0);
+      $actionMsg = sprintf('Removed from cart: %s x%d', $safeName, $qty);
+      log_action($conn, (int)$_SESSION['user_id'], $actionMsg);
+    }
     }
     header('Location: /SCP/products/cart.php');
     exit();
@@ -48,10 +62,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_quantity'])) {
     $new_quantity = intval($_POST['quantity'] ?? 1);
     
     if (isset($_SESSION['user_id']) && $new_quantity > 0) {
-        $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?");
-        $stmt->bind_param('iii', $new_quantity, $_SESSION['user_id'], $product_id);
-        $stmt->execute();
-        $stmt->close();
+    $preStmt = $conn->prepare("SELECT product_name, quantity FROM cart WHERE user_id = ? AND product_id = ?");
+    $preStmt->bind_param('ii', $_SESSION['user_id'], $product_id);
+    $preStmt->execute();
+    $preRes = $preStmt->get_result();
+    $existing = $preRes ? $preRes->fetch_assoc() : null;
+    $preStmt->close();
+
+    $oldQty = $existing ? (int)$existing['quantity'] : null;
+    $safeName = $existing && is_string($existing['product_name']) ? $existing['product_name'] : 'Unknown Product';
+
+    $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?");
+    $stmt->bind_param('iii', $new_quantity, $_SESSION['user_id'], $product_id);
+    $stmt->execute();
+    $stmt->close();
+
+    if ($existing && function_exists('log_action')) {
+      $delta = $new_quantity - $oldQty;
+      $sign = $delta > 0 ? '+' : ($delta < 0 ? '-' : '');
+      $deltaAbs = abs($delta);
+      $actionMsg = $sign !== ''
+        ? sprintf('Updated cart qty: %s %d → %d (%s%d)', $safeName, $oldQty, $new_quantity, $sign, $deltaAbs)
+        : sprintf('Updated cart qty: %s unchanged at %d', $safeName, $new_quantity);
+      log_action($conn, (int)$_SESSION['user_id'], $actionMsg);
+    }
     }
     header('Location: /SCP/products/cart.php');
     exit();
@@ -261,13 +295,6 @@ include '../includes/header.php';
   </div>
 
   <script>
-    <?php if (isset($_SESSION['checkout_success']) && $_SESSION['checkout_success']): ?>
-      <?php unset($_SESSION['checkout_success']); ?>
-      document.addEventListener('DOMContentLoaded', function() {
-        showToast("Purchase confirmed! Awaiting approval. You'll receive an email once approved.", 'success');
-      });
-    <?php endif; ?>
-
     function updateQuantity(productId, newQty) {
       if (newQty < 1) newQty = 1;
       if (newQty > 99) newQty = 99;
@@ -299,5 +326,15 @@ include '../includes/header.php';
     }
   </script>
 <?php endif; ?>
+
+<?php if (!empty($_SESSION['checkout_success'])): ?>
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    if (typeof showToast === 'function') {
+      showToast("Your order has been checked out and is awaiting approval.", 'success');
+    }
+  });
+</script>
+<?php unset($_SESSION['checkout_success']); endif; ?>
 
 <?php include '../includes/footer.php'; ?>
