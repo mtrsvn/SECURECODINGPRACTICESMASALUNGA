@@ -136,6 +136,13 @@ include '../includes/header.php';
       transition: all 0.2s ease;
       font-weight: 600;
     }
+    .qty-display {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #1e293b;
+    }
     .btn-remove {
       color: #dc2626;
       transition: all 0.2s ease;
@@ -177,7 +184,7 @@ include '../includes/header.php';
               <button type="button" class="btn btn-qty" onclick="updateQuantity(<?= $pid ?>, <?= $qty ?> - 1)">
                 <i class="fas fa-minus"></i>
               </button>
-              <input type="number" id="qty-<?= $pid ?>" value="<?= $qty ?>" min="1" max="99" readonly>
+              <span class="qty-display"><?= $qty ?></span>
               <button type="button" class="btn btn-qty" onclick="updateQuantity(<?= $pid ?>, <?= $qty ?> + 1)">
                 <i class="fas fa-plus"></i>
               </button>

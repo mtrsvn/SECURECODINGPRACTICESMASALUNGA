@@ -72,9 +72,6 @@ include 'includes/header.php';
 
 <div class="page-header">
   <h2>Products</h2>
-  <?php if(isset($_SESSION['username'])): ?>
-    <p style="color: #64748b; margin-top: 0.5rem;">Welcome back, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>!</p>
-  <?php endif; ?>
 </div>
 
 <style>

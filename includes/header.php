@@ -62,6 +62,10 @@ if (ob_get_level() === 0) {
       transition: color 0.2s;
     }
     .nav-link:hover { color: var(--primary) !important; }
+    .nav-link.active {
+      color: var(--primary) !important;
+      font-weight: 600;
+    }
     .nav-link.logout-link:hover { color: #dc2626 !important; }
     .btn-primary {
       background: var(--primary);
@@ -193,6 +197,11 @@ if (ob_get_level() === 0) {
   </style>
 </head>
 <body>
+<?php
+// Detect current page for active nav indicator
+$current_page = basename($_SERVER['PHP_SELF']);
+$current_dir = basename(dirname($_SERVER['PHP_SELF']));
+?>
 <nav class="navbar navbar-expand-lg mb-4">
   <div class="container">
     <a class="navbar-brand" href="/SCP/index.php">
@@ -204,18 +213,18 @@ if (ob_get_level() === 0) {
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
       <ul class="navbar-nav align-items-center gap-1">
         <?php if(isset($_SESSION['username'])): ?>
-          <li class="nav-item"><a class="nav-link" href="/SCP/products/products.php">Products</a></li>
-          <li class="nav-item"><a class="nav-link" href="/SCP/products/cart.php">Cart</a></li>
+          <li class="nav-item"><a class="nav-link <?= ($current_page == 'products.php' || $current_page == 'index.php') ? 'active' : '' ?>" href="/SCP/products/products.php">Products</a></li>
+          <li class="nav-item"><a class="nav-link <?= $current_page == 'cart.php' ? 'active' : '' ?>" href="/SCP/products/cart.php">Cart</a></li>
           <?php if(isset($_SESSION['role']) && $_SESSION['role']=='admin_sec'): ?>
-            <li class="nav-item"><a class="nav-link" href="/SCP/admin/users.php">Users</a></li>
-            <li class="nav-item"><a class="nav-link" href="/SCP/admin/audit_log.php">Logs</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'users.php' ? 'active' : '' ?>" href="/SCP/admin/users.php">Users</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'audit_log.php' ? 'active' : '' ?>" href="/SCP/admin/audit_log.php">Logs</a></li>
           <?php endif; ?>
           <?php if(isset($_SESSION['role']) && ($_SESSION['role']=='staff_user' || $_SESSION['role']=='admin_sec')): ?>
-            <li class="nav-item"><a class="nav-link" href="/SCP/staff/approve.php">Orders</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'approve.php' ? 'active' : '' ?>" href="/SCP/staff/approve.php">Orders</a></li>
           <?php endif; ?>
           <li class="nav-item ms-2"><a class="nav-link logout-link" href="/SCP/auth/logout.php">Logout</a></li>
         <?php else: ?>
-          <li class="nav-item"><a class="nav-link" href="/SCP/products/products.php">Products</a></li>
+          <li class="nav-item"><a class="nav-link <?= ($current_page == 'products.php' || $current_page == 'index.php') ? 'active' : '' ?>" href="/SCP/products/products.php">Products</a></li>
           <li class="nav-item"><a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Login</a></li>
           <li class="nav-item"><a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#registerModal">Register</a></li>
         <?php endif; ?>
