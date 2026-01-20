@@ -64,11 +64,32 @@ if (isset($_POST['checkout'])) {
         $stmt->execute();
         $result = $stmt->get_result();
         
+        $totalItems = 0;
+        $orderItems = [];
+        $orderTotal = 0;
         while ($item = $result->fetch_assoc()) {
-            $stmt2 = $conn->prepare("INSERT INTO purchases (user_id, product_id, quantity) VALUES (?, ?, ?)");
-            $stmt2->bind_param('iii', $_SESSION['user_id'], $item['product_id'], $item['quantity']);
+            $stmt2 = $conn->prepare("INSERT INTO purchases (user_id, product_id, quantity, product_name, product_price) VALUES (?, ?, ?, ?, ?)");
+            
+            // Get product details from cart
+            $cartStmt = $conn->prepare("SELECT product_name, product_price FROM cart WHERE user_id = ? AND product_id = ?");
+            $cartStmt->bind_param('ii', $_SESSION['user_id'], $item['product_id']);
+            $cartStmt->execute();
+            $cartResult = $cartStmt->get_result();
+            $cartItem = $cartResult->fetch_assoc();
+            $cartStmt->close();
+            
+            $stmt2->bind_param('iiisd', $_SESSION['user_id'], $item['product_id'], $item['quantity'], $cartItem['product_name'], $cartItem['product_price']);
             $stmt2->execute();
             $stmt2->close();
+            $totalItems += $item['quantity'];
+            
+            // Collect items for email
+            $orderItems[] = [
+                'name' => $cartItem['product_name'],
+                'quantity' => $item['quantity'],
+                'price' => $cartItem['product_price']
+            ];
+            $orderTotal += $cartItem['product_price'] * $item['quantity'];
         }
         $stmt->close();
         
@@ -79,6 +100,23 @@ if (isset($_POST['checkout'])) {
         $stmt->close();
         
         log_action($conn, $_SESSION['user_id'], "Purchase created, awaiting staff approval");
+        
+        // Send purchase confirmation email
+        require_once '../includes/mailer.php';
+        $userStmt = $conn->prepare("SELECT email, username FROM users WHERE id = ?");
+        $userStmt->bind_param('i', $_SESSION['user_id']);
+        $userStmt->execute();
+        $userResult = $userStmt->get_result();
+        $userData = $userResult->fetch_assoc();
+        $userStmt->close();
+        
+        if ($userData) {
+            send_purchase_confirmation_email($userData['email'], $userData['username'], $orderItems, $orderTotal);
+        }
+        
+        $_SESSION['checkout_success'] = true;
+        header('Location: /SCP/products/cart.php');
+        exit();
     }
 }
 
@@ -211,7 +249,45 @@ include '../includes/header.php';
     </table>
   </div>
 
+  <div class="d-flex justify-content-end mt-4">
+    <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#checkoutModal">
+      Proceed to Checkout
+    </button>
+  </div>
+
+  <!-- Checkout Confirmation Modal -->
+  <div class="modal fade" id="checkoutModal" tabindex="-1" aria-labelledby="checkoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="checkoutModalLabel">Confirm Your Order</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to complete this purchase?</p>
+          <p class="mb-0"><strong>Total: $<?= number_format($total, 2) ?></strong></p>
+          <p class="text-muted" style="font-size: 0.9rem; margin-top: 1rem;">You will receive a shipping confirmation email once your order is dispatched.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <form method="post" style="margin: 0;">
+            <button type="submit" name="checkout" class="btn btn-primary">
+              <i class="fas fa-check me-2"></i>Confirm Order
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    <?php if (isset($_SESSION['checkout_success']) && $_SESSION['checkout_success']): ?>
+      <?php unset($_SESSION['checkout_success']); ?>
+      document.addEventListener('DOMContentLoaded', function() {
+        showToast('Purchase confirmed! Your order is being shipped. Check your email for confirmation.', 'success');
+      });
+    <?php endif; ?>
+
     function updateQuantity(productId, newQty) {
       if (newQty < 1) newQty = 1;
       if (newQty > 99) newQty = 99;
