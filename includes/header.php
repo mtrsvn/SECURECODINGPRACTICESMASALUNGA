@@ -210,7 +210,7 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
 ?>
 <nav class="navbar navbar-expand-lg mb-4">
   <div class="container">
-    <a class="navbar-brand" href="/SCP/index.php">
+    <a class="navbar-brand" href="/SCP/products/products.php">
       <span class="brand-text">CARTIFY</span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -222,21 +222,26 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
           <?php 
             $isAdminUser = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator','admin_sec']);
             $canSeeAudit = isset($_SESSION['role']) && in_array($_SESSION['role'], ['administrator','admin_sec']);
-            $canManageProducts = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator']);
+            $canManageProducts = isset($_SESSION['role']) && in_array($_SESSION['role'], ['staff_user','administrator','admin_sec']);
+            $isAdminSec = isset($_SESSION['role']) && $_SESSION['role'] === 'admin_sec';
           ?>
           <?php if ($canManageProducts): ?>
-            <li class="nav-item"><a class="nav-link <?= $current_page == 'products_manage.php' ? 'active' : '' ?>" href="/SCP/staff/products_manage.php">Manage Products</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'products_manage.php' ? 'active' : '' ?>" href="/SCP/staff/products_manage.php">Products</a></li>
           <?php endif; ?>
-          <li class="nav-item"><a class="nav-link <?= ($current_page == 'products.php' || $current_page == 'index.php') ? 'active' : '' ?>" href="/SCP/products/products.php">Products</a></li>
-          <?php if ($canSeeAudit): ?>
+          <?php if (!$isAdminUser): ?>
+            <li class="nav-item"><a class="nav-link <?= ($current_page == 'products.php' || $current_page == 'index.php') ? 'active' : '' ?>" href="/SCP/products/products.php">Products</a></li>
+          <?php endif; ?>
+          <?php if ($isAdminSec): ?>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'users_manage.php' ? 'active' : '' ?>" href="/SCP/admin/users_manage.php">Staffs</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'approve.php' ? 'active' : '' ?>" href="/SCP/staff/approve.php">Orders</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'purchase_records.php' ? 'active' : '' ?>" href="/SCP/admin/purchase_records.php">Purchase Records</a></li>
+            <li class="nav-item"><a class="nav-link <?= $current_page == 'audit_log.php' ? 'active' : '' ?>" href="/SCP/admin/audit_log.php">Audit</a></li>
+          <?php elseif ($canSeeAudit): ?>
             <li class="nav-item"><a class="nav-link <?= $current_page == 'audit_log.php' ? 'active' : '' ?>" href="/SCP/admin/audit_log.php">Audit</a></li>
           <?php elseif (!$isAdminUser): ?>
             <li class="nav-item"><a class="nav-link <?= $current_page == 'cart.php' ? 'active' : '' ?>" href="/SCP/products/cart.php">Cart</a></li>
           <?php endif; ?>
-          <?php if(isset($_SESSION['role']) && $_SESSION['role']=='admin_sec'): ?>
-            <li class="nav-item"><a class="nav-link <?= $current_page == 'users.php' ? 'active' : '' ?>" href="/SCP/admin/users.php">Users</a></li>
-          <?php endif; ?>
-          <?php if(isset($_SESSION['role']) && ($_SESSION['role']=='staff_user' || $_SESSION['role']=='admin_sec')): ?>
+          <?php if(isset($_SESSION['role']) && $_SESSION['role']=='staff_user'): ?>
             <li class="nav-item"><a class="nav-link <?= $current_page == 'approve.php' ? 'active' : '' ?>" href="/SCP/staff/approve.php">Orders</a></li>
           <?php endif; ?>
           <li class="nav-item ms-2"><a class="nav-link logout-link" href="/SCP/auth/logout.php">Logout</a></li>
@@ -466,7 +471,7 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
         }).then(r => r.json())
         .then(data => {
           if(data.success){
-            window.location = data.redirect || '/SCP/index.php';
+            window.location = data.redirect || '/SCP/products/products.php';
           } else if(data.require_otp) {
             const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
             if(loginModal) loginModal.hide();
@@ -572,7 +577,7 @@ $current_dir = basename(dirname($_SERVER['PHP_SELF']));
           if(data.success){
             showToast('Email verified successfully! Redirecting...', 'success');
             setTimeout(() => {
-              window.location = data.redirect || '/SCP/index.php';
+              window.location = data.redirect || '/SCP/products/products.php';
             }, 1500);
           } else {
             showToast(data.message || 'Invalid OTP', 'danger');

@@ -3,15 +3,18 @@ require_once '../includes/db.php';
 require_once '../includes/functions.php';
 include '../includes/header.php';
 
-if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['staff_user','administrator'])) {
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['staff_user','administrator','admin_sec'], true)) {
   include '../includes/footer.php';
   exit();
 }
 ?>
 
 <div class="page-header d-flex align-items-center justify-content-between">
-  <h2>Manage Products</h2>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal" onclick="openAddModal()">Add Product</button>
+  <h2>Products</h2>
+  <div class="d-flex align-items-center gap-2">
+    <a class="btn btn-outline-secondary" href="/SCP/index.php">View Products</a>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal" onclick="openAddModal()">Add Product</button>
+  </div>
 </div>
 
 <div id="productsPanel" class="card">
@@ -35,7 +38,6 @@ if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['staff_user','adm
   </div>
 </div>
 
-<!-- Add/Edit Modal -->
 <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">

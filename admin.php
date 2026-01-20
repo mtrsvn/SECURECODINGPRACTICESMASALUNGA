@@ -160,7 +160,7 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['role'])) {
             </div>
         </div>
         <div class="back-to-site">
-            <a href="/SCP/index.php">← Back to Main Site</a>
+            <a href="/SCP/products/products.php">← Back to Main Site</a>
         </div>
     </div>
 

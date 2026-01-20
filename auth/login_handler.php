@@ -31,7 +31,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['role'] = $user['role'];
             $_SESSION['username'] = $user['username'];
             log_action($conn, $user['id'], "User logged in");
-            echo json_encode(['success' => true, 'redirect' => '/SCP/index.php']);
+
+            $redirect = '/SCP/index.php';
+            if (in_array($user['role'], ['staff_user', 'admin_sec'], true)) {
+                $redirect = '/SCP/staff/approve.php';
+            }
+
+            echo json_encode(['success' => true, 'redirect' => $redirect]);
             exit();
         } else {
             $failed = $user['failed_logins'] + 1;

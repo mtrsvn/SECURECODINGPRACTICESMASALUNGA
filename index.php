@@ -4,7 +4,7 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 
 $products = [];
-$result = $conn->query("SELECT * FROM products ORDER BY display_order ASC, id ASC");
+$result = $conn->query("SELECT * FROM products ORDER BY id DESC");
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $products[] = $row;
@@ -40,6 +40,10 @@ if ($sort === 'price_asc') {
   usort($products, function($a, $b){ return ($a['price'] ?? 0) <=> ($b['price'] ?? 0); });
 } elseif ($sort === 'price_desc') {
   usort($products, function($a, $b){ return ($b['price'] ?? 0) <=> ($a['price'] ?? 0); });
+} elseif ($sort === 'date_asc') {
+  usort($products, function($a, $b){ return (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0); });
+} elseif ($sort === 'date_desc') {
+  usort($products, function($a, $b){ return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0); });
 }
 
 if (isset($_GET['ajax'])) {
@@ -50,6 +54,17 @@ if (isset($_GET['ajax'])) {
 
 include 'includes/header.php';
 ?>
+
+ 
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 11000;">
+  <div id="cartToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <strong class="me-auto" id="toastTitle">Notification</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastBody"></div>
+  </div>
+  </div>
 
 <div class="page-header">
   <h2>Products</h2>
@@ -106,6 +121,8 @@ include 'includes/header.php';
       <option value="">Sort</option>
       <option value="price_asc" <?= $sort==='price_asc' ? 'selected' : '' ?>>Price: Low to High</option>
       <option value="price_desc" <?= $sort==='price_desc' ? 'selected' : '' ?>>Price: High to Low</option>
+      <option value="date_asc" <?= $sort==='date_asc' ? 'selected' : '' ?>>Date: Oldest to Newest</option>
+      <option value="date_desc" <?= $sort==='date_desc' ? 'selected' : '' ?>>Date: Newest to Oldest</option>
     </select>
   </div>
 </form>
@@ -154,10 +171,9 @@ document.addEventListener('DOMContentLoaded', function(){
       const id = parseInt(p.id) || 0;
       const image = escapeHtml(p.image || '');
       const category = escapeHtml(p.category || '');
-      const rating = (p.rating && p.rating.rate) ? Number(p.rating.rate).toFixed(1) : '';
       const productJson = JSON.stringify(p).replace(/'/g, '&apos;').replace(/"/g, '&quot;');
-      html += `\n<div class="col-md-4">\n  <div class="card h-100 product-card" onclick='openProductModal(${productJson})'>\n    ${image?`<img src="${image}" class="card-img-top" alt="${name}" style="height: 250px; object-fit: contain; padding: 1rem;">` : ''}\n    <div class="card-body d-flex flex-column">\n      ${category?`<span class="badge bg-secondary mb-2 align-self-start">${category}</span>` : ''}\n      <h5 class="card-title mb-2" style="min-height: 3rem; font-size: 1rem;">${name}</h5>\n      <p class="card-text" style="color: #64748b; flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${desc.length>100?desc.substr(0,100)+'...':desc}</p>\n      <div class="mt-auto">\n        <div class="d-flex justify-content-between align-items-center">\n          <strong class="text-primary" style="font-size: 1.25rem;">$${price}</strong>\n          ${rating?`<span class="text-muted" style="font-size: 0.85rem;"><span class="text-warning">★</span> ${rating}</span>`:''}
-        </div>\n      </div>\n    </div>\n  </div>\n</div>`;
+
+      html += `\n<div class="col-md-4">\n  <div class="card h-100 product-card" onclick='openProductModal(${productJson})'>\n    ${image?`<img src="${image}" class="card-img-top" alt="${name}" style="height: 250px; object-fit: contain; padding: 1rem;">` : ''}\n    <div class="card-body d-flex flex-column">\n      ${category?`<span class="badge bg-secondary mb-2 align-self-start">${category}</span>` : ''}\n      <h5 class="card-title mb-2" style="min-height: 3rem; font-size: 1rem;">${name}</h5>\n      <p class="card-text" style="color: #64748b; flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${desc.length>100?desc.substr(0,100)+'...':desc}</p>\n      <div class="mt-auto">\n        <div class="d-flex justify-content-between align-items-center">\n          <strong class="text-primary" style="font-size: 1.25rem;">$${price}</strong>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>`;
     }
     html += '\n</div>';
     container.innerHTML = html;
@@ -180,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function(){
       $id = (int)($product['id'] ?? 0);
       $image = htmlspecialchars($product['image'] ?? '');
       $category = htmlspecialchars($product['category'] ?? '');
-      $rating = isset($product['rating']['rate']) ? number_format($product['rating']['rate'], 1) : '';
       $productJson = htmlspecialchars(json_encode($product), ENT_QUOTES);
   ?>
     <div class="col-md-4">
@@ -197,11 +212,6 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="mt-auto">
             <div class="d-flex justify-content-between align-items-center">
               <strong class="text-primary" style="font-size: 1.25rem;">$<?= $price ?></strong>
-              <?php if ($rating): ?>
-              <span class="text-muted" style="font-size: 0.85rem;">
-                <span class="text-warning">★</span> <?= $rating ?>
-              </span>
-              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -231,11 +241,6 @@ document.addEventListener('DOMContentLoaded', function(){
               <p id="modalProductDescription" class="text-muted mb-3" style="font-size: 0.95rem;"></p>
             </div>
             <div class="mb-4">
-              <div class="d-flex align-items-center mb-2">
-                <span class="text-warning me-2">★</span>
-                <span id="modalProductRating" class="me-2"></span>
-                <span id="modalProductRatingCount" class="text-muted" style="font-size: 0.9rem;"></span>
-              </div>
               <h3 id="modalProductPrice" class="text-primary mb-4"></h3>
             </div>
             <?php 
@@ -263,7 +268,12 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
               </div>
               <button type="button" class="btn btn-primary w-100 btn-lg" id="addToCartBtn" data-product-id="">
-                <i class="fas fa-shopping-cart me-2"></i>Add to Cart
+                <span id="addToCartBtnText">
+                  <i class="fas fa-shopping-cart me-2"></i>Add to Cart
+                </span>
+                <span id="addToCartBtnLoading" class="d-none">
+                  <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Adding...
+                </span>
               </button>
               <?php endif; ?>
             <?php endif; ?>
@@ -286,20 +296,27 @@ document.addEventListener('DOMContentLoaded', function(){
   border-color: #3b82f6;
 }
 .quantity-selector .quantity-btn {
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   padding: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  border-width: 2px;
+  font-weight: 600;
 }
 .quantity-selector .quantity-btn:hover {
   background: #3b82f6;
   border-color: #3b82f6;
   color: white;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
+.quantity-selector .quantity-btn:active { transform: scale(0.95); }
+#addToCartBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4) !important; }
+#addToCartBtn:active { transform: translateY(0); }
 .quantity-selector input::-webkit-outer-spin-button,
 .quantity-selector input::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -313,29 +330,57 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 let currentProduct = null;
 
+function showCartToast(message, type = 'success') {
+  const toast = document.getElementById('cartToast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastBody = document.getElementById('toastBody');
+  const toastHeader = toast ? toast.querySelector('.toast-header') : null;
+
+  if (!toast || !toastHeader || !toastBody || !toastTitle || typeof bootstrap === 'undefined') {
+    alert(message);
+    return;
+  }
+
+  toastHeader.className = 'toast-header';
+  if (type === 'success') {
+    toastHeader.classList.add('bg-success', 'text-white');
+    toastTitle.innerHTML = '<i class="fas fa-check-circle me-2"></i>Success!';
+  } else if (type === 'danger') {
+    toastHeader.classList.add('bg-danger', 'text-white');
+    toastTitle.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Error!';
+  } else if (type === 'warning') {
+    toastHeader.classList.add('bg-warning', 'text-dark');
+    toastTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Warning!';
+  } else {
+    toastTitle.textContent = 'Notice';
+  }
+
+  toastBody.textContent = message;
+  const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+  bsToast.show();
+}
+
+ 
+
 function openProductModal(product) {
   currentProduct = product;
-  document.getElementById('productModalLabel').textContent = product.title;
-  document.getElementById('modalProductImage').src = product.image;
-  document.getElementById('modalProductImage').alt = product.title;
+  const safeTitle = product.title || 'Product';
+  const safeDesc = product.description || 'No description available.';
+  const safeImage = product.image || 'https://via.placeholder.com/400x300?text=No+Image';
+
+  document.getElementById('productModalLabel').textContent = safeTitle;
+  document.getElementById('modalProductImage').src = safeImage;
+  document.getElementById('modalProductImage').alt = safeTitle;
   document.getElementById('modalProductCategory').textContent = product.category || 'Product';
-  document.getElementById('modalProductTitle').textContent = product.title;
-  document.getElementById('modalProductDescription').textContent = product.description || 'No description available.';
-  document.getElementById('modalProductPrice').textContent = '$' + (product.price || 0).toFixed(2);
-  
-  if (product.rating) {
-    document.getElementById('modalProductRating').textContent = product.rating.rate + '/5';
-    document.getElementById('modalProductRatingCount').textContent = '(' + product.rating.count + ' reviews)';
-  } else {
-    document.getElementById('modalProductRating').textContent = 'N/A';
-    document.getElementById('modalProductRatingCount').textContent = '';
-  }
-  
+  document.getElementById('modalProductTitle').textContent = safeTitle;
+  document.getElementById('modalProductDescription').textContent = safeDesc;
+  document.getElementById('modalProductPrice').textContent = '$' + (Number(product.price) || 0).toFixed(2);
+
   const qtyEl = document.getElementById('modalQuantity');
   if (qtyEl) qtyEl.value = 1;
   const addBtn = document.getElementById('addToCartBtn');
   if (addBtn) addBtn.setAttribute('data-product-id', product.id);
-  
+
   const modal = new bootstrap.Modal(document.getElementById('productModal'));
   modal.show();
 }
@@ -370,6 +415,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const productId = this.getAttribute('data-product-id');
     const quantity = parseInt((document.getElementById('modalQuantity')||{value:1}).value) || 1;
     
+    const btnText = document.getElementById('addToCartBtnText');
+    const btnLoading = document.getElementById('addToCartBtnLoading');
+    if (btnText && btnLoading) {
+      btnText.classList.add('d-none');
+      btnLoading.classList.remove('d-none');
+      this.disabled = true;
+    }
+
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('quantity', quantity);
@@ -380,15 +433,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     fetch('/SCP/products/cart.php', {
       method: 'POST',
-      body: formData
+      body: formData,
+      credentials: 'same-origin'
     })
     .then(response => {
+      if (!response.ok) { throw new Error('Failed to add to cart'); }
       bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-      showToast('Item added to cart!', 'success');
+      showCartToast(`${quantity} × ${currentProduct.title} added to cart!`, 'success');
     })
     .catch(error => {
       console.error('Error:', error);
-      showToast('Failed to add item to cart', 'danger');
+      showCartToast('Failed to add item to cart. Please try again.', 'danger');
+    })
+    .finally(() => {
+      if (btnText && btnLoading) {
+        btnText.classList.remove('d-none');
+        btnLoading.classList.add('d-none');
+        addBtn.disabled = false;
+      }
     });
     <?php else: ?>
     bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();

@@ -27,8 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $stmt2->bind_param("i", $user_id);
                     $stmt2->execute();
                     $stmt2->close();
-
-                    // Log the user in after successful verification
+                    
                     $_SESSION['user_id'] = $user_id;
                     $_SESSION['role'] = 'regular_user';
                     $_SESSION['username'] = $username;

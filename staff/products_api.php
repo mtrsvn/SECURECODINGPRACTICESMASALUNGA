@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
-if ($_SESSION['role'] !== 'staff_user' && $_SESSION['role'] !== 'administrator') {
+if (!in_array($_SESSION['role'], ['staff_user','administrator','admin_sec'], true)) {
     echo json_encode(['success' => false, 'message' => 'Access denied']);
     exit();
 }
@@ -39,7 +39,8 @@ switch ($action) {
 }
 
 function listProducts($conn) {
-    $result = $conn->query("SELECT * FROM products ORDER BY display_order ASC, id ASC");
+    // Show newest products first in the management UI
+    $result = $conn->query("SELECT * FROM products ORDER BY id DESC");
     if (!$result) {
         echo json_encode(['success' => false, 'message' => 'Database error']);
         return;
@@ -158,7 +159,6 @@ function deleteProduct($conn, $user_id) {
 function reorderProducts($conn, $user_id) {
     $orderJson = $_POST['order'] ?? '';
     
-    // Decode JSON string to array
     $order = json_decode($orderJson, true);
     
     if (!is_array($order) || empty($order)) {

@@ -25,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         if (password_verify($password, $user['password_hash'])) {
-            if ($user['role'] !== 'staff_user' && $user['role'] !== 'administrator') {
+            if (!in_array($user['role'], ['staff_user', 'administrator', 'admin_sec'], true)) {
                 echo json_encode([
                     'success' => false, 
                     'message' => "Access denied. Only staff members and administrators can access this portal."
@@ -42,10 +42,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['username'] = $user['username'];
             
             log_action($conn, $user['id'], "Admin login - " . $user['role']);
-            
+
+            $redirect = '/SCP/admin/dashboard.php';
+            if (in_array($user['role'], ['staff_user', 'admin_sec'], true)) {
+                $redirect = '/SCP/staff/approve.php';
+            }
+
             echo json_encode([
                 'success' => true, 
-                'redirect' => '/SCP/admin/dashboard.php'
+                'redirect' => $redirect
             ]);
             exit();
         } else {
