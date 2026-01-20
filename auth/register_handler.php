@@ -19,7 +19,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
         exit();
     }
-    // Check password strength requirements
     if (!preg_match('/[A-Z]/', $password)) {
         echo json_encode(['success' => false, 'message' => 'Password must contain at least one uppercase letter.']);
         exit();
@@ -48,7 +47,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION['otp_user_id'] = $conn->insert_id;
         $_SESSION['otp_email'] = $email;
         
-        // Send OTP via email using PHPMailer
         $send = send_otp_email($email, $username, (string)$otp);
         if(!$send['success']){
             echo json_encode(['success' => false, 'message' => 'Registration succeeded but failed to send OTP email: ' . htmlspecialchars($send['error'] ?? 'unknown')]);

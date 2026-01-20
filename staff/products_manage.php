@@ -149,15 +149,16 @@ async function openEditModal(id){
 
 async function confirmDelete(id){
   if(!confirm('Delete this product?')) return;
+  console.log('Deleting product ID:', id);
   const form = new URLSearchParams();
   form.set('action','delete');
   form.set('product_id', id);
   const data = await fetchJSON(apiBase, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: form.toString() });
+  console.log('Delete response:', data);
   if(data.success){ alertBox('Product deleted', 'success'); loadProducts(); }
   else { alertBox(data.message || 'Delete failed'); }
 }
 
-// Submit handler
 const productForm = document.getElementById('productForm');
 productForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -180,7 +181,9 @@ productForm.addEventListener('submit', async (e)=>{
   if(id){ action = 'update'; form.set('product_id', id); }
   form.set('action', action);
 
+  console.log('Submitting product:', action, form.toString());
   const data = await fetchJSON(apiBase, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: form.toString() });
+  console.log('Submit response:', data);
   if(data.success){
     alertBox('Product saved', 'success');
     const modalEl = document.getElementById('productModal');
@@ -192,7 +195,6 @@ productForm.addEventListener('submit', async (e)=>{
   }
 });
 
-// initial
 loadProducts();
 </script>
 

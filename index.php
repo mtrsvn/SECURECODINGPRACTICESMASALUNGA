@@ -3,25 +3,12 @@ session_start();
 require_once 'includes/db.php';
 require_once 'includes/functions.php';
 
-$api_url = 'https://fakestoreapi.com/products';
 $products = [];
-
-$response = @file_get_contents($api_url);
-if ($response !== false) {
-    $products = json_decode($response, true);
-} else {
-    if (function_exists('curl_init')) {
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        $response = curl_exec($ch);
-        curl_close($ch);
-        if ($response !== false) {
-            $products = json_decode($response, true);
-        }
+$result = $conn->query("SELECT * FROM products");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $products[] = $row;
     }
-
-        
 }
 
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
@@ -39,7 +26,7 @@ if ($q !== '' || ($categoryFilter !== '' && $categoryFilter !== 'all')) {
   $products = array_filter($products, function($p) use ($q, $categoryFilter) {
     $ok = true;
     if ($q !== '') {
-      $ok = stripos($p['title'] ?? '', $q) !== false;
+      $ok = stripos($p['name'] ?? '', $q) !== false || stripos($p['description'] ?? '', $q) !== false;
     }
     if ($ok && $categoryFilter !== '' && $categoryFilter !== 'all') {
       $ok = ($p['category'] ?? '') === $categoryFilter;
@@ -162,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
     let html = '<div class="row g-4">';
     for (const p of items) {
-      const name = escapeHtml(p.title || 'N/A');
+      const name = escapeHtml(p.name || 'N/A');
       const desc = escapeHtml(p.description || '');
       const price = (typeof p.price !== 'undefined') ? Number(p.price).toFixed(2) : '0.00';
       const id = parseInt(p.id) || 0;
@@ -202,11 +189,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <div id="productsContainer">
 <?php if (empty($products)): ?>
-  <div class="alert alert-warning">Unable to load products from the API. Please try again later.</div>
+  <div class="alert alert-warning">No products available at the moment.</div>
 <?php else: ?>
   <div class="row g-4">
   <?php foreach ($products as $product):
-      $name = htmlspecialchars($product['title'] ?? 'N/A');
+      $name = htmlspecialchars($product['name'] ?? 'N/A');
       $desc = htmlspecialchars($product['description'] ?? '');
       $price = number_format((float)($product['price'] ?? 0), 2);
       $id = (int)($product['id'] ?? 0);
@@ -338,11 +325,11 @@ let currentProduct = null;
 
 function openProductModal(product) {
   currentProduct = product;
-  document.getElementById('productModalLabel').textContent = product.title;
+  document.getElementById('productModalLabel').textContent = product.name;
   document.getElementById('modalProductImage').src = product.image;
-  document.getElementById('modalProductImage').alt = product.title;
+  document.getElementById('modalProductImage').alt = product.name;
   document.getElementById('modalProductCategory').textContent = product.category || 'Product';
-  document.getElementById('modalProductTitle').textContent = product.title;
+  document.getElementById('modalProductTitle').textContent = product.name;
   document.getElementById('modalProductDescription').textContent = product.description || 'No description available.';
   document.getElementById('modalProductPrice').textContent = '$' + (product.price || 0).toFixed(2);
   
@@ -396,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const formData = new FormData();
     formData.append('product_id', productId);
     formData.append('quantity', quantity);
-    formData.append('product_name', currentProduct.title || 'Unknown Product');
+    formData.append('product_name', currentProduct.name || 'Unknown Product');
     formData.append('product_price', currentProduct.price || 0);
     formData.append('product_image', currentProduct.image || '');
     formData.append('add_to_cart', '1');

@@ -17,17 +17,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->close();
         
         if ($user) {
-            // Generate new OTP
             $otp = rand(100000, 999999);
             $otp_expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
             
-            // Update OTP in database
             $stmt2 = $conn->prepare("UPDATE users SET otp_code=?, otp_expires=? WHERE id=?");
             $stmt2->bind_param("ssi", $otp, $otp_expires, $user_id);
             $stmt2->execute();
             $stmt2->close();
             
-            // Send new OTP via email
             $send = send_otp_email($user['email'], $user['username'], (string)$otp);
             
             if($send['success']){
