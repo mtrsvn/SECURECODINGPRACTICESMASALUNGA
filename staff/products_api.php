@@ -103,10 +103,11 @@ function addProduct($conn, $user_id) {
         return;
     }
 
-    // Determine next display order (append to end)
-    $maxRes = $conn->query("SELECT COALESCE(MAX(display_order), 0) AS max_order FROM products");
-    $row = $maxRes ? $maxRes->fetch_assoc() : ['max_order' => 0];
-    $nextOrder = (int)($row['max_order'] ?? 0) + 1;
+    // Determine display order so the new product appears at the top
+    // Use the current minimum display_order and subtract 1
+    $minRes = $conn->query("SELECT COALESCE(MIN(display_order), 1) AS min_order FROM products");
+    $row = $minRes ? $minRes->fetch_assoc() : ['min_order' => 1];
+    $nextOrder = (int)($row['min_order'] ?? 1) - 1;
 
     $stmt = $conn->prepare("INSERT INTO products (title, price, category, description, image, display_order) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param('sdsssi', $title, $price, $category, $description, $image, $nextOrder);

@@ -26,6 +26,9 @@ switch ($action) {
     case 'approve':
         approveOrder($conn, $_SESSION['user_id']);
         break;
+    case 'reject':
+        rejectOrder($conn, $_SESSION['user_id']);
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action']);
 }
@@ -111,34 +114,96 @@ function approveOrder($conn, $user_id) {
     
     if ($stmt->execute()) {
         log_action($conn, $user_id, "Approved purchase order #$order_id");
-        
-        if (!empty($order['email'])) {
-            $customer_name = $order['username'] ?? 'Customer';
-            $email_subject = "Your Order #$order_id Has Been Shipped!";
-            $email_body = "
-                <h2>Great News!</h2>
-                <p>Hello $customer_name,</p>
-                <p>Your order <strong>#$order_id</strong> has been approved and is being shipped to you!</p>
-                <p><strong>Order Details:</strong></p>
-                <ul>
-                    <li>Order Number: #$order_id</li>
-                    <li>Total Amount: $" . number_format($order['total_amount'], 2) . "</li>
-                    <li>Status: Approved & Shipped</li>
-                </ul>
-                <p>Thank you for shopping with us!</p>
-                <p>Best regards,<br>SCP Team</p>
-            ";
-            
+
+        // Send approval email using helper
+        $customer_email = $order['email'] ?? '';
+        if (!empty($customer_email)) {
+            $customer_name = $order['username'] ?? $customer_email;
+            $items = [];
+            $decoded = json_decode($order['items'] ?? '[]', true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $it) {
+                    $items[] = [
+                        'name' => $it['name'] ?? ($it['title'] ?? 'Item'),
+                        'quantity' => (int)($it['quantity'] ?? 1),
+                        'price' => (float)($it['price'] ?? 0)
+                    ];
+                }
+            }
+            $total = isset($order['total_amount']) ? (float)$order['total_amount'] : 0.0;
             try {
-                sendEmail($order['email'], $order['username'] ?? 'Customer', $email_subject, $email_body);
+                send_purchase_confirmation_email($customer_email, $customer_name, $items, $total);
             } catch (Exception $e) {
                 error_log("Failed to send approval email: " . $e->getMessage());
             }
         }
-        
+
         echo json_encode(['success' => true, 'message' => 'Order approved and customer notified']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Error approving order']);
+    }
+}
+
+function rejectOrder($conn, $user_id) {
+    $order_id = intval($_POST['order_id'] ?? 0);
+
+    if ($order_id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid order ID']);
+        return;
+    }
+
+    $stmt = $conn->prepare("SELECT po.*, u.username, u.email 
+                            FROM purchase_orders po 
+                            LEFT JOIN users u ON po.user_id = u.id 
+                            WHERE po.id = ?");
+    $stmt->bind_param("i", $order_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $order = $result->fetch_assoc();
+
+    if (!$order) {
+        echo json_encode(['success' => false, 'message' => 'Order not found']);
+        return;
+    }
+
+    if ($order['status'] === 'rejected') {
+        echo json_encode(['success' => false, 'message' => 'Order is already rejected']);
+        return;
+    }
+
+    $stmt = $conn->prepare("UPDATE purchase_orders SET status = 'rejected', rejected_at = NOW(), approved_by = ? WHERE id = ?");
+    $stmt->bind_param("ii", $user_id, $order_id);
+
+    if ($stmt->execute()) {
+        log_action($conn, $user_id, "Rejected purchase order #$order_id");
+
+        // Send rejection email using helper
+        $customer_email = $order['email'] ?? '';
+        if (!empty($customer_email)) {
+            $customer_name = $order['username'] ?? $customer_email;
+            $items = [];
+            $decoded = json_decode($order['items'] ?? '[]', true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $it) {
+                    $items[] = [
+                        'name' => $it['name'] ?? ($it['title'] ?? 'Item'),
+                        'quantity' => (int)($it['quantity'] ?? 1),
+                        'price' => (float)($it['price'] ?? 0)
+                    ];
+                }
+            }
+            $total = isset($order['total_amount']) ? (float)$order['total_amount'] : 0.0;
+            $reason = trim($_POST['reason'] ?? '');
+            try {
+                send_purchase_rejection_email($customer_email, $customer_name, $items, $total, $reason);
+            } catch (Exception $e) {
+                error_log("Failed to send rejection email: " . $e->getMessage());
+            }
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Order rejected and customer notified']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error rejecting order']);
     }
 }
 ?>
